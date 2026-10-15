@@ -36,7 +36,7 @@ export function Reveal({ children, className, delay = 0, from = 'up', as }: Reve
       style={{ transitionDelay: visible ? `${delay}ms` : '0ms' }}
       className={cn(
         'transition-all duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform motion-reduce:transition-none',
-        visible ? 'opacity-100 translate-y-0 translate-x-0 scale-100 blur-0' : cn('opacity-0 blur-[2px]', offset[from]),
+        visible ? 'opacity-100 translate-y-0 translate-x-0 scale-100 blur-none' : cn('opacity-0 blur-[2px]', offset[from]),
         className,
       )}
     >

@@ -204,8 +204,8 @@ export function StudioDemo() {
                   Rec.709 · 8K · 23.976
                 </span>
               </div>
-              <div className="hidden items-center gap-1 text-xs text-mint-brand sm:flex">
-                <span className="size-1.5 animate-pulse rounded-full bg-mint-brand" />
+              <div className="hidden items-center gap-1 text-xs text-mint sm:flex">
+                <span className="size-1.5 animate-pulse rounded-full bg-mint" />
                 GPU 42%
               </div>
             </div>

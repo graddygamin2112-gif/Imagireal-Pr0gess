@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowRight, Play, Sparkles } from 'lucide-react';
 import { HeroCanvas } from '@/components/hero/HeroCanvas';
 import { Reveal } from '@/components/motion/Reveal';
@@ -8,12 +8,37 @@ const ROTATING = ['Timelines', 'Storyboards', 'Grade', 'Sound', 'Anything'];
 
 export function Hero() {
   const [index, setIndex] = useState(0);
+  const measureRef = useRef<HTMLSpanElement | null>(null);
+  const [widths, setWidths] = useState<number[]>([]);
 
   useEffect(() => {
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     const id = setInterval(() => setIndex((i) => (i + 1) % ROTATING.length), 2200);
     return () => clearInterval(id);
   }, []);
+
+  /**
+   * Measure the natural width of each rotating word so the container can
+   * animate to the active one. This is what makes "Edit" glide toward shorter
+   * words instead of leaving the gap left behind by the longest word.
+   */
+  useLayoutEffect(() => {
+    const measure = () => {
+      const container = measureRef.current;
+      if (!container) return;
+      const spans = Array.from(container.children) as HTMLElement[];
+      const next = spans.map((span) => span.getBoundingClientRect().width);
+      setWidths(next);
+    };
+
+    measure();
+    // Fonts finish loading after first paint and change glyph widths.
+    document.fonts?.ready.then(measure).catch(() => undefined);
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
+  const activeWidth = widths[index];
 
   const scrollTo = (id: string) =>
     document.querySelector(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -35,24 +60,38 @@ export function Hero() {
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-wide text-muted-foreground backdrop-blur">
             <Sparkles className="size-3.5 text-iris" />
             Free forever for independent editors
-            <span className="ml-1 rounded-full bg-mint-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-mint-brand">
+            <span className="ml-1 rounded-full bg-mint/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-mint">
               v3.0
             </span>
           </span>
         </Reveal>
 
         <Reveal delay={80}>
-          <h1 className="mt-8 font-display text-[clamp(2.6rem,9vw,7rem)] font-semibold leading-[0.94] tracking-[-0.03em]">
+          <h1 className="relative mt-8 font-display text-[clamp(2.6rem,9vw,7rem)] font-semibold leading-[0.94] tracking-[-0.03em]">
+            {/* Hidden rulers: measured so the rotating word's container can
+                animate to the width of whichever word is showing. */}
+            <span
+              ref={measureRef}
+              aria-hidden="true"
+              className="pointer-events-none absolute left-0 top-0 -z-10 whitespace-nowrap opacity-0"
+            >
+              {ROTATING.map((word) => (
+                <span key={word} className="inline-block">
+                  {word}
+                </span>
+              ))}
+            </span>
+
             Edit{' '}
-            <span className="relative inline-grid overflow-hidden align-bottom">
-              <span className="invisible col-start-1 row-start-1 font-semibold" aria-hidden="true">
-                {ROTATING.reduce((a, b) => (a.length >= b.length ? a : b))}
-              </span>
+            <span
+              className="relative inline-grid overflow-hidden align-bottom transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+              style={{ width: activeWidth && activeWidth > 0 ? `${activeWidth}px` : undefined }}
+            >
               {ROTATING.map((word, i) => (
                 <span
                   key={word}
                   aria-hidden={i !== index}
-                  className="col-start-1 row-start-1 text-spectrum transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+                  className="col-start-1 row-start-1 whitespace-nowrap text-spectrum transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
                   style={{
                     transform: `translateY(${(i - index) * 100}%)`,
                     opacity: i === index ? 1 : 0,

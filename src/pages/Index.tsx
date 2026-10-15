@@ -6,6 +6,7 @@ import { Stats } from '@/components/sections/Stats';
 import { LogoStrip } from '@/components/sections/LogoStrip';
 import { Features } from '@/components/sections/Features';
 import { StudioDemo } from '@/components/sections/StudioDemo';
+import { Showcase3D } from '@/components/sections/Showcase3D';
 import { Workflow } from '@/components/sections/Workflow';
 import { Pricing } from '@/components/sections/Pricing';
 import { Testimonials } from '@/components/sections/Testimonials';
@@ -31,6 +32,7 @@ const Index = () => {
         <LogoStrip />
         <Features />
         <StudioDemo />
+        <Showcase3D />
         <Workflow />
         <Pricing />
         <Testimonials />

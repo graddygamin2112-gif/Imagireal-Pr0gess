@@ -290,9 +290,6 @@
   }
 
   .text-iris { color: var(--iris); }
-  .text-violet-brand { color: var(--violet); }
-  .text-magenta-brand { color: var(--magenta); }
-  .text-mint-brand { color: var(--mint); }
 
   .bg-spectrum {
     background-image: linear-gradient(100deg, var(--iris), var(--violet) 50%, var(--magenta));
