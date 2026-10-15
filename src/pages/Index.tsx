@@ -11,6 +11,7 @@ import { Workflow } from '@/components/sections/Workflow';
 import { Pricing } from '@/components/sections/Pricing';
 import { Testimonials } from '@/components/sections/Testimonials';
 import { CTA, Footer } from '@/components/sections/CTA';
+import { ScrollAurora } from '@/components/motion/ScrollAurora';
 
 const Index = () => {
   useSeoMeta({
@@ -25,6 +26,7 @@ const Index = () => {
 
   return (
     <div className="grain relative min-h-screen overflow-x-clip bg-background">
+      <ScrollAurora />
       <Nav />
       <main>
         <Hero />

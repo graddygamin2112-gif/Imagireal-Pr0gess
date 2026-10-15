@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type Ref } from 'react';
 
 interface Point3D {
   x: number;
@@ -34,10 +34,17 @@ const BRAND_HUES = [174, 262, 318, 162];
  * keeps the hero dependency-free, tiny, and reliable across browsers — while
  * still delivering genuine 3D parallax and depth.
  */
-export function HeroCanvas({ className }: { className?: string }) {
+export function HeroCanvas({ className, ref }: { className?: string; ref?: Ref<HTMLCanvasElement> }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pointer = useRef({ x: 0, y: 0 });
   const target = useRef({ x: 0, y: 0 });
+
+  /** Keep the internal ref and any externally supplied ref in sync. */
+  const setCanvasRef = (node: HTMLCanvasElement | null) => {
+    canvasRef.current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) (ref as React.MutableRefObject<HTMLCanvasElement | null>).current = node;
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -246,7 +253,7 @@ export function HeroCanvas({ className }: { className?: string }) {
 
   return (
     <canvas
-      ref={canvasRef}
+      ref={setCanvasRef}
       aria-hidden="true"
       className={className}
     />

@@ -1,5 +1,6 @@
 import { Check, Sparkles } from 'lucide-react';
 import { Reveal } from '@/components/motion/Reveal';
+import { useParallax } from '@/hooks/useParallax';
 import { cn } from '@/lib/utils';
 
 interface Plan {
@@ -61,9 +62,11 @@ const PLANS: Plan[] = [
 ];
 
 export function Pricing() {
+  const glowRef = useParallax<HTMLDivElement>({ speed: 0.22, scale: 0.12 });
+
   return (
     <section id="pricing" className="relative scroll-mt-24 py-28 sm:py-36">
-      <div className="pointer-events-none absolute inset-x-0 top-1/2 -z-10 h-[36rem] -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,color-mix(in_oklab,var(--iris)_12%,transparent),transparent_65%)]" />
+      <div ref={glowRef} className="pointer-events-none absolute inset-x-0 top-1/2 -z-10 h-[36rem] -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,color-mix(in_oklab,var(--iris)_12%,transparent),transparent_65%)]" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <Reveal>

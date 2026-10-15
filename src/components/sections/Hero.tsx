@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowRight, Play, Sparkles } from 'lucide-react';
 import { HeroCanvas } from '@/components/hero/HeroCanvas';
 import { Reveal } from '@/components/motion/Reveal';
+import { useParallax } from '@/hooks/useParallax';
 
 /** Words that cycle through the hero headline. */
 const ROTATING = ['Timelines', 'Storyboards', 'Grade', 'Sound', 'Anything'];
@@ -10,6 +11,10 @@ export function Hero() {
   const [index, setIndex] = useState(0);
   const measureRef = useRef<HTMLSpanElement | null>(null);
   const [widths, setWidths] = useState<number[]>([]);
+
+  // Scroll-scrubbed layers — the hero recedes and dissolves as you scroll.
+  const canvasRef = useParallax<HTMLCanvasElement>({ speed: 0.28, scale: -0.12, fade: true });
+  const contentRef = useParallax<HTMLDivElement>({ speed: 0.14, scale: -0.06, fade: true });
 
   useEffect(() => {
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
@@ -53,9 +58,9 @@ export function Hero() {
         <div className="absolute inset-0 bg-grid opacity-[0.35] mask-fade-y" />
       </div>
 
-      <HeroCanvas className="absolute inset-0 -z-[5] size-full opacity-80 [mask-image:radial-gradient(circle_at_60%_45%,black_0%,transparent_72%)]" />
+      <HeroCanvas ref={canvasRef} className="absolute inset-0 -z-[5] size-full opacity-80 [mask-image:radial-gradient(circle_at_60%_45%,black_0%,transparent_72%)]" />
 
-      <div className="relative mx-auto flex max-w-7xl flex-col items-center px-4 pb-24 pt-10 text-center sm:px-6 lg:pt-16">
+      <div ref={contentRef} className="relative mx-auto flex max-w-7xl flex-col items-center px-4 pb-24 pt-10 text-center sm:px-6 lg:pt-16">
         <Reveal from="down">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-wide text-muted-foreground backdrop-blur">
             <Sparkles className="size-3.5 text-iris" />

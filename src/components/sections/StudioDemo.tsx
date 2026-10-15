@@ -168,6 +168,7 @@ export function StudioDemo() {
 
   return (
     <section id="studio" className="relative scroll-mt-24 py-24 sm:py-32">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-96 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklab,var(--iris)_10%,transparent),transparent_70%)]" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>

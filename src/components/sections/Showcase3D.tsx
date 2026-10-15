@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Play, Pause, RotateCw } from 'lucide-react';
 import { Reveal } from '@/components/motion/Reveal';
 import { cn } from '@/lib/utils';
 
@@ -17,110 +17,112 @@ const STILLS: Still[] = [
   { title: 'Aperture', meta: 'Title sequence', duration: '02:41', from: '322 92% 58%', to: '174 90% 52%' },
   { title: 'Halcyon', meta: 'Music video', duration: '04:32', from: '158 80% 50%', to: '262 88% 60%' },
   { title: 'Meridian', meta: 'Trailer', duration: '01:58', from: '200 90% 55%', to: '322 92% 60%' },
+  { title: 'Umbra', meta: 'Fashion film', duration: '03:15', from: '268 85% 58%', to: '318 90% 52%' },
 ];
 
-const LAST = STILLS.length - 1;
+const COUNT = STILLS.length;
+/** Angular width of one card slot on the cylinder. */
+const STEP = 360 / COUNT;
+/** Cylinder radius, in px — tuned so cards overlap slightly at the sides. */
+const RADIUS = 640;
 
 export function Showcase3D() {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const targetRef = useRef(2);
-  const currentRef = useRef(2);
-  const interacted = useRef(false);
-  const dragging = useRef(false);
-  const dragStartX = useRef(0);
-  const dragStartTarget = useRef(0);
-  const [activeIndex, setActiveIndex] = useState(2);
-
-  const setTarget = useCallback((value: number | ((prev: number) => number)) => {
-    const next = typeof value === 'function' ? value(targetRef.current) : value;
-    targetRef.current = Math.min(Math.max(next, 0), LAST);
-  }, []);
+  const angleRef = useRef(0); // live rotation of the cylinder, in degrees
+  const velocityRef = useRef(0); // deg per frame, for drag inertia
+  const autoRef = useRef(true); // auto-rotation on until the user grabs it
+  const draggingRef = useRef(false);
+  const lastXRef = useRef(0);
+  const hasDraggedRef = useRef(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [spinning, setSpinning] = useState(true);
 
   /**
-   * Layout + easing are applied imperatively (via refs) rather than through
-   * React state, so the 3D transforms update every frame without re-rendering
-   * the tree — smooth even on mobile.
+   * The whole carousel is animated imperatively in one rAF loop. Rotation
+   * lives in a ref, so spinning never triggers a React re-render.
    */
   useEffect(() => {
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     let raf = 0;
-    const apply = () => {
-      const stage = stageRef.current;
-      const unit = (stage ? stage.clientWidth : 900) / STILLS.length;
 
-      // Ease the current position toward the target on every frame.
-      currentRef.current += (targetRef.current - currentRef.current) * 0.11;
-      const currentPos = currentRef.current;
+    const apply = () => {
+      // Inertia after a drag, plus constant auto-rotation when idle.
+      if (!draggingRef.current) {
+        if (autoRef.current && !reduced) {
+          angleRef.current += 0.18;
+        }
+        angleRef.current += velocityRef.current;
+        velocityRef.current *= 0.94;
+        if (Math.abs(velocityRef.current) < 0.002) velocityRef.current = 0;
+      }
 
       cardRefs.current.forEach((card, i) => {
         if (!card) return;
-        const offset = i - currentPos;
-        const abs = Math.abs(offset);
-        const clamped = Math.min(abs, 3);
+        // Angle of this card relative to the camera.
+        const theta = i * STEP + angleRef.current;
+        const rad = (theta * Math.PI) / 180;
+        const x = Math.sin(rad) * RADIUS;
+        const z = Math.cos(rad) * RADIUS;
 
-        card.style.transform = `translate(-50%, -50%) translateX(${(offset * unit * 0.62).toFixed(2)}px) translateZ(${(-clamped * 150).toFixed(1)}px) rotateY(${(offset * -22).toFixed(2)}deg) scale(${(1 - clamped * 0.07).toFixed(3)})`;
-        card.style.opacity = abs > 2.6 ? '0' : String(Math.max(1 - abs * 0.16, 0));
-        card.style.zIndex = String(100 - Math.round(abs * 10));
-        card.style.pointerEvents = abs > 2.6 ? 'none' : 'auto';
+        const facing = (z + RADIUS) / (2 * RADIUS); // 1 = front, 0 = back
+        card.style.transform = `translate(-50%, -50%) translateX(${x.toFixed(2)}px) translateZ(${z.toFixed(2)}px) rotateY(${(-theta).toFixed(2)}deg)`;
+        card.style.opacity = String(Math.max(0, Math.min(1, (facing - 0.15) * 1.6)));
+        card.style.zIndex = String(Math.round(z));
+        card.style.pointerEvents = facing > 0.6 ? 'auto' : 'none';
+        card.style.filter = `saturate(${(0.55 + facing * 0.75).toFixed(3)}) brightness(${(0.55 + facing * 0.7).toFixed(3)})`;
       });
 
-      // Mark the visually-centred card as active for the control dots.
-      const nearest = Math.round(currentPos);
+      // Highlight whichever card is closest to the camera.
+      const normalised = ((-angleRef.current % 360) + 360) % 360;
+      const nearest = Math.round(normalised / STEP) % COUNT;
       setActiveIndex((prev) => (prev === nearest ? prev : nearest));
 
       raf = requestAnimationFrame(apply);
     };
+
     raf = requestAnimationFrame(apply);
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  /* ---- Gentle auto-advance until the visitor takes over ------------------ */
-  useEffect(() => {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    const id = setInterval(() => {
-      if (interacted.current || dragging.current) return;
-      setTarget((t) => (t >= LAST ? 0 : Math.round(t) + 1));
-    }, 3600);
-    return () => clearInterval(id);
-  }, [setTarget]);
+  /* ---- Pointer interaction ------------------------------------------------- */
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    draggingRef.current = true;
+    hasDraggedRef.current = false;
+    lastXRef.current = e.clientX;
+    velocityRef.current = 0;
+    (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
+  }, []);
 
-  /* ---- Pointer interaction: hover on desktop, swipe on touch ------------- */
-  const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    interacted.current = true;
-    if (dragging.current) {
-      const stage = stageRef.current;
-      if (!stage) return;
-      const dx = event.clientX - dragStartX.current;
-      const perCard = stage.clientWidth / STILLS.length;
-      const next = dragStartTarget.current - dx / perCard;
-      setTarget(next);
-      return;
-    }
-    // Desktop hover: map cursor position across the stage to a still index.
-    const stage = stageRef.current;
-    if (!stage) return;
-    if (event.pointerType !== 'mouse') return;
-    const rect = stage.getBoundingClientRect();
-    const ratio = Math.min(Math.max((event.clientX - rect.left) / rect.width, 0), 1);
-    setTarget(ratio * LAST);
-  }, [setTarget]);
-
-  const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    interacted.current = true;
-    dragging.current = true;
-    dragStartX.current = event.clientX;
-    dragStartTarget.current = targetRef.current;
-    (event.currentTarget as HTMLDivElement).setPointerCapture?.(event.pointerId);
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    const dx = e.clientX - lastXRef.current;
+    lastXRef.current = e.clientX;
+    // Convert horizontal motion into rotation; scale down vertically-distant moves.
+    const delta = dx * 0.35;
+    angleRef.current += delta;
+    velocityRef.current = delta;
+    if (Math.abs(dx) > 3) hasDraggedRef.current = true;
   }, []);
 
   const endDrag = useCallback(() => {
-    dragging.current = false;
+    draggingRef.current = false;
   }, []);
 
-  const step = useCallback((dir: 1 | -1) => {
-    interacted.current = true;
-    setTarget((t) => Math.min(Math.max(Math.round(t) + dir, 0), LAST));
-  }, [setTarget]);
+  const toggleSpin = useCallback(() => {
+    autoRef.current = !autoRef.current;
+    setSpinning(autoRef.current);
+  }, []);
+
+  const focusCard = useCallback((index: number) => {
+    autoRef.current = false;
+    setSpinning(false);
+    // Ease toward the shortest path to bring `index` to the front.
+    const target = -index * STEP;
+    const current = angleRef.current;
+    const delta = ((target - current + 540) % 360) - 180;
+    velocityRef.current = delta / 24;
+  }, []);
 
   return (
     <section id="showreel" className="relative scroll-mt-24 overflow-hidden py-24 sm:py-32">
@@ -141,29 +143,29 @@ export function Showcase3D() {
           </Reveal>
           <Reveal delay={140}>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              Drag, swipe or glide your cursor across the reel to explore work cut entirely inside
-              Imagireal.
+              <span className="hidden sm:inline">Drag the reel to spin it, or let it drift. </span>
+              <span className="sm:hidden">Swipe the reel to spin it. </span>
+              Every one of these projects was cut entirely inside Imagireal.
             </p>
           </Reveal>
         </div>
       </div>
 
-      {/* 3D stage */}
+      {/* 3D cylinder stage */}
       <div
         ref={stageRef}
         role="group"
-        aria-label="Interactive 3D project gallery"
-        onPointerMove={handlePointerMove}
+        aria-label="Interactive 3D project carousel"
         onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
         onPointerCancel={endDrag}
-        className="perspective relative mt-16 h-[300px] cursor-grab touch-pan-y select-none active:cursor-grabbing sm:h-[400px] lg:h-[460px]"
+        className="perspective relative mt-16 h-[320px] cursor-grab touch-pan-y select-none active:cursor-grabbing sm:h-[420px] lg:h-[480px]"
       >
         <div className="preserve-3d relative h-full w-full">
           {STILLS.map((still, i) => {
             const isActive = i === activeIndex;
-
             return (
               <button
                 key={still.title}
@@ -171,20 +173,17 @@ export function Showcase3D() {
                   cardRefs.current[i] = node;
                 }}
                 onClick={() => {
-                  interacted.current = true;
-                  setTarget(i);
+                  if (hasDraggedRef.current) return; // ignore the click that ends a drag
+                  focusCard(i);
                 }}
                 aria-label={`${still.title} — ${still.meta}`}
                 className={cn(
-                  'group absolute left-1/2 top-1/2 h-[190px] w-[300px] overflow-hidden rounded-2xl border text-left will-change-transform motion-reduce:transition-none sm:h-[260px] sm:w-[420px] lg:h-[300px] lg:w-[500px]',
-                  isActive ? 'border-white/25' : 'border-white/8',
+                  'group absolute left-1/2 top-1/2 h-[210px] w-[320px] overflow-hidden rounded-2xl border text-left will-change-transform sm:h-[280px] sm:w-[440px] lg:h-[320px] lg:w-[520px]',
+                  isActive ? 'border-white/30' : 'border-white/10',
                 )}
-                style={{
-                  transform: 'translate(-50%, -50%)',
-                  transition: 'opacity 300ms ease, border-color 300ms ease',
-                }}
+                style={{ transform: 'translate(-50%, -50%)', transition: 'border-color 300ms ease' }}
               >
-                {/* Faux graded still — layered gradients evoke a cinematic frame */}
+                {/* Faux graded still */}
                 <span
                   className="absolute inset-0"
                   style={{
@@ -194,27 +193,24 @@ export function Showcase3D() {
                       linear-gradient(155deg, #0a0b1c, #05060f 72%)`,
                   }}
                 />
-                {/* Subject silhouette + vignette for depth */}
                 <span className="absolute inset-0 grid place-items-center">
                   <span className="h-1/2 w-1/4 rounded-[45%_45%_40%_40%/58%_58%_42%_42%] bg-black/40 blur-[3px]" />
                 </span>
-                <span className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.75),transparent_55%)]" />
+                <span className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.78),transparent_55%)]" />
                 <span className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,rgba(255,255,255,0.035)_0px,rgba(255,255,255,0.035)_1px,transparent_1px,transparent_3px)] mix-blend-overlay" />
 
-                {/* Play affordance on the active card */}
                 <span
                   className={cn(
-                    'pointer-events-none absolute left-1/2 top-1/2 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white/15 backdrop-blur transition-all duration-300',
+                    'pointer-events-none absolute left-1/2 top-1/2 grid size-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white/15 backdrop-blur transition-all duration-300',
                     isActive ? 'scale-100 opacity-100' : 'scale-75 opacity-0',
                   )}
                 >
-                  <Play className="size-5 fill-white text-white" />
+                  <Play className="size-6 fill-white text-white" />
                 </span>
 
-                {/* Caption */}
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5">
                   <span className="min-w-0">
-                    <span className="block font-display text-lg font-semibold tracking-tight text-white">
+                    <span className="block font-display text-xl font-semibold tracking-tight text-white">
                       {still.title}
                     </span>
                     <span className="block text-xs text-white/70">{still.meta}</span>
@@ -227,26 +223,31 @@ export function Showcase3D() {
             );
           })}
         </div>
+
+        {/* Drag hint */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center">
+          <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/60 backdrop-blur">
+            ← drag to spin →
+          </span>
+        </div>
       </div>
 
       {/* Controls */}
       <div className="mt-10 flex items-center justify-center gap-5">
         <button
-          onClick={() => step(-1)}
-          aria-label="Previous project"
+          onClick={toggleSpin}
+          aria-label={spinning ? 'Pause auto-spin' : 'Resume auto-spin'}
+          aria-pressed={spinning}
           className="grid size-11 place-items-center rounded-full border border-white/12 bg-white/5 text-foreground transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <ArrowLeft className="size-4" />
+          {spinning ? <Pause className="size-4" /> : <RotateCw className="size-4" />}
         </button>
 
         <div className="flex items-center gap-2">
           {STILLS.map((still, i) => (
             <button
               key={still.title}
-              onClick={() => {
-                interacted.current = true;
-                setTarget(i);
-              }}
+              onClick={() => focusCard(i)}
               aria-label={`Show ${still.title}`}
               aria-current={i === activeIndex}
               className={cn(
@@ -257,13 +258,9 @@ export function Showcase3D() {
           ))}
         </div>
 
-        <button
-          onClick={() => step(1)}
-          aria-label="Next project"
-          className="grid size-11 place-items-center rounded-full border border-white/12 bg-white/5 text-foreground transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <ArrowRight className="size-4" />
-        </button>
+        <span className="w-11 text-center font-mono text-xs text-muted-foreground">
+          {String(activeIndex + 1).padStart(2, '0')}/{String(COUNT).padStart(2, '0')}
+        </span>
       </div>
     </section>
   );

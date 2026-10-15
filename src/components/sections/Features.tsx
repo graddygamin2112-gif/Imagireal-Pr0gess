@@ -8,6 +8,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useTilt } from '@/hooks/useTilt';
+import { useParallax } from '@/hooks/useParallax';
 import { Reveal } from '@/components/motion/Reveal';
 import { cn } from '@/lib/utils';
 
@@ -116,8 +117,11 @@ function FeatureCard({ feature, delay }: { feature: Feature; delay: number }) {
 }
 
 export function Features() {
+  const glowRef = useParallax<HTMLDivElement>({ speed: 0.3, scale: 0.1 });
+
   return (
     <section id="features" className="relative scroll-mt-28 py-28 sm:py-36">
+      <div ref={glowRef} className="pointer-events-none absolute left-1/2 top-1/4 -z-10 size-[40rem] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--iris)_12%,transparent),transparent_65%)] blur-3xl" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
