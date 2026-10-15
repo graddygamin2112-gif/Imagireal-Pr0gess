@@ -1,0 +1,18 @@
+{
+  "name": "Imagireal — Professional Video Editing Suite",
+  "short_name": "Imagireal",
+  "description": "A free, professional-grade video editing suite with real-time 8K playback, node colour grading and studio sound.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#05060f",
+  "theme_color": "#05060f",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

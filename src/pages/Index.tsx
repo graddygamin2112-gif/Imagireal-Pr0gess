@@ -1,23 +1,42 @@
 import { useSeoMeta } from '@unhead/react';
 
-// FIXME: Update this page (the content is just a fallback if you fail to update the page)
+import { Nav } from '@/components/sections/Nav';
+import { Hero } from '@/components/sections/Hero';
+import { Stats } from '@/components/sections/Stats';
+import { LogoStrip } from '@/components/sections/LogoStrip';
+import { Features } from '@/components/sections/Features';
+import { StudioDemo } from '@/components/sections/StudioDemo';
+import { Workflow } from '@/components/sections/Workflow';
+import { Pricing } from '@/components/sections/Pricing';
+import { Testimonials } from '@/components/sections/Testimonials';
+import { CTA, Footer } from '@/components/sections/CTA';
 
 const Index = () => {
   useSeoMeta({
-    title: 'Welcome to Your Blank App',
-    description: 'A modern Nostr client application built with React, TailwindCSS, and Nostrify.',
+    title: 'Imagireal — Free Professional Video Editing Suite',
+    description:
+      'Imagireal is a free, professional-grade video editing suite with real-time 8K playback, node colour grading and studio sound — no subscriptions, no watermarks.',
+    ogTitle: 'Imagireal — Edit at the speed of thought',
+    ogDescription:
+      'A free, professional video editing suite for editors who refuse to compromise. Real-time 8K, node colour, studio sound, unlimited free exports.',
+    ogType: 'website',
   });
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4 text-gray-900 dark:text-gray-100">
-          Welcome to Your Blank App
-        </h1>
-        <p className="text-xl text-gray-600 dark:text-gray-400">
-          Start building your amazing project here!
-        </p>
-      </div>
+    <div className="grain relative min-h-screen overflow-x-clip bg-background">
+      <Nav />
+      <main>
+        <Hero />
+        <Stats />
+        <LogoStrip />
+        <Features />
+        <StudioDemo />
+        <Workflow />
+        <Pricing />
+        <Testimonials />
+        <CTA />
+      </main>
+      <Footer />
     </div>
   );
 };
