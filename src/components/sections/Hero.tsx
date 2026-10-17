@@ -26,21 +26,47 @@ export function Hero() {
    * Measure the natural width of each rotating word so the container can
    * animate to the active one. This is what makes "Edit" glide toward shorter
    * words instead of leaving the gap left behind by the longest word.
+   *
+   * IMPORTANT: we read `offsetWidth`, not `getBoundingClientRect().width`.
+   * The hero content is wrapped in a parallax layer that applies a CSS `scale`
+   * transform, and `getBoundingClientRect()` reports post-transform sizes —
+   * which made every width slightly wrong and clipped the words. `offsetWidth`
+   * is a pure layout metric and ignores ancestor transforms.
    */
   useLayoutEffect(() => {
     const measure = () => {
       const container = measureRef.current;
       if (!container) return;
       const spans = Array.from(container.children) as HTMLElement[];
-      const next = spans.map((span) => span.getBoundingClientRect().width);
-      setWidths(next);
+      // `offsetWidth` is a pure layout metric that ignores ancestor transforms.
+      // +4px guards against sub-pixel rounding and trailing letter-spacing so a
+      // word can never be under-measured.
+      const next = spans.map((span) => Math.ceil(span.offsetWidth) + 4);
+      if (next.length === ROTATING.length && next.every((w) => w > 0)) {
+        setWidths(next);
+      }
     };
 
+    // Re-measure whenever the rulers change size: font load, viewport resize,
+    // zoom, etc. More reliable than a one-shot measurement.
     measure();
-    // Fonts finish loading after first paint and change glyph widths.
     document.fonts?.ready.then(measure).catch(() => undefined);
+
+    let ro: ResizeObserver | undefined;
+    const container = measureRef.current;
+    if (typeof ResizeObserver !== 'undefined' && container) {
+      ro = new ResizeObserver(measure);
+      ro.observe(container);
+    }
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    // Late pass catches any layout settled after first paint.
+    const t = window.setTimeout(measure, 350);
+
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', measure);
+      window.clearTimeout(t);
+    };
   }, []);
 
   const activeWidth = widths[index];
@@ -89,14 +115,15 @@ export function Hero() {
 
             Edit{' '}
             <span
-              className="relative inline-grid overflow-hidden align-bottom transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+              data-testid="hero-rotating-word"
+              className="relative inline-grid justify-items-start align-bottom text-left transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
               style={{ width: activeWidth && activeWidth > 0 ? `${activeWidth}px` : undefined }}
             >
               {ROTATING.map((word, i) => (
                 <span
                   key={word}
                   aria-hidden={i !== index}
-                  className="col-start-1 row-start-1 whitespace-nowrap text-spectrum transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+                  className="col-start-1 row-start-1 whitespace-nowrap text-left text-spectrum transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
                   style={{
                     transform: `translateY(${(i - index) * 100}%)`,
                     opacity: i === index ? 1 : 0,

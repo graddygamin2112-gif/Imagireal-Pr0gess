@@ -122,12 +122,14 @@ export function HeroCanvas({ className, ref }: { className?: string; ref?: Ref<H
     let raf = 0;
 
     const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      width = rect.width;
-      height = rect.height;
+      // Layout metrics, not the rendered rect: the canvas is scaled by a
+      // parallax transform, and we want the backing store sized to the
+      // element's true CSS box.
+      width = canvas.offsetWidth;
+      height = canvas.offsetHeight;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
+      canvas.width = Math.max(1, Math.floor(width * dpr));
+      canvas.height = Math.max(1, Math.floor(height * dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
@@ -226,9 +228,11 @@ export function HeroCanvas({ className, ref }: { className?: string; ref?: Ref<H
 
     const onPointerMove = (event: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
+      const w = rect.width || 1;
+      const h = rect.height || 1;
       target.current = {
-        x: ((event.clientX - rect.left) / rect.width - 0.5) * 1.2,
-        y: ((event.clientY - rect.top) / rect.height - 0.5) * 1.2,
+        x: ((event.clientX - rect.left) / w - 0.5) * 1.2,
+        y: ((event.clientY - rect.top) / h - 0.5) * 1.2,
       };
     };
 

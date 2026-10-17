@@ -118,8 +118,17 @@ export function StudioDemo() {
   const seekFromClientX = useCallback((clientX: number) => {
     const node = timelineRef.current;
     if (!node) return;
-    const rect = node.getBoundingClientRect();
-    const ratio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+    // Use layout metrics rather than the rendered rect: the workspace sits
+    // inside a reveal transition that scales it, and layout values keep the
+    // scrub mapping exact regardless of that transform.
+    let left = 0;
+    let el: HTMLElement | null = node;
+    while (el) {
+      left += el.offsetLeft;
+      el = el.offsetParent as HTMLElement | null;
+    }
+    const width = node.offsetWidth || 1;
+    const ratio = Math.min(Math.max((clientX + window.scrollX - left) / width, 0), 1);
     setTime(ratio * DURATION);
   }, []);
 

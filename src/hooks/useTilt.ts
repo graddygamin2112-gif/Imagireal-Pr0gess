@@ -10,8 +10,13 @@ interface TiltState {
 const REST: TiltState = { rotateX: 0, rotateY: 0, glareX: 50, glareY: 50 };
 
 /**
- * Pointer-driven 3D tilt for cards. Tracks the cursor relative to the element
- * and emits rotateX/rotateY plus a glare position for the sheen highlight.
+ * Pointer-driven 3D tilt for cards.
+ *
+ * The pointer ratio is computed from the element's *layout* box
+ * (`offsetWidth`/`offsetHeight` plus the document offset), not its rendered
+ * bounding rect. That is essential: the card is rotated by this very hook, so
+ * reading `getBoundingClientRect()` would feed the tilt back into the
+ * measurement and make the card jitter under the cursor.
  */
 export function useTilt(max = 12) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -23,15 +28,27 @@ export function useTilt(max = 12) {
       if (!node) return;
       if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
-      const rect = node.getBoundingClientRect();
-      const px = (event.clientX - rect.left) / rect.width;
-      const py = (event.clientY - rect.top) / rect.height;
+      // Accumulate the element's layout position on the document.
+      let left = 0;
+      let top = 0;
+      let el: HTMLElement | null = node;
+      while (el) {
+        left += el.offsetLeft;
+        top += el.offsetTop;
+        el = el.offsetParent as HTMLElement | null;
+      }
+
+      const px = (event.clientX + window.scrollX - left) / (node.offsetWidth || 1);
+      const py = (event.clientY + window.scrollY - top) / (node.offsetHeight || 1);
+
+      const clampedX = Math.min(Math.max(px, 0), 1);
+      const clampedY = Math.min(Math.max(py, 0), 1);
 
       setState({
-        rotateX: (0.5 - py) * max,
-        rotateY: (px - 0.5) * max,
-        glareX: px * 100,
-        glareY: py * 100,
+        rotateX: (0.5 - clampedY) * max,
+        rotateY: (clampedX - 0.5) * max,
+        glareX: clampedX * 100,
+        glareY: clampedY * 100,
       });
     },
     [max],

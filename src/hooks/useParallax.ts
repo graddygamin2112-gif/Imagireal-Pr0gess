@@ -14,11 +14,33 @@ interface ParallaxOptions {
 }
 
 /**
- * Applies a scroll-driven transform to an element imperatively.
+ * Walk the offsetParent chain to find an element's position in the document.
  *
- * Uses a passive scroll listener plus a single batched `requestAnimationFrame`,
- * so the transform is written straight to the node's style without triggering a
- * React re-render. Fully disabled under `prefers-reduced-motion`.
+ * Unlike `getBoundingClientRect()`, this uses `offsetTop`/`offsetLeft`, which
+ * are pure layout values that ignore CSS transforms. That matters because this
+ * hook transforms the very element it measures — if we measured the rendered
+ * rect each frame, the element would chase its own transform and jitter.
+ */
+function documentOffset(el: HTMLElement): { x: number; y: number } {
+  let x = 0;
+  let y = 0;
+  let node: HTMLElement | null = el;
+  while (node) {
+    x += node.offsetLeft;
+    y += node.offsetTop;
+    node = node.offsetParent as HTMLElement | null;
+  }
+  return { x, y };
+}
+
+/**
+ * Apply a scroll-driven transform to an element, imperatively.
+ *
+ * Progress is derived from the page scroll position and the element's
+ * transform-independent layout offset — never from its own bounding rect — so
+ * the effect stays stable regardless of the scale/rotation we apply. Updates
+ * run off a passive scroll listener batched into one `requestAnimationFrame`,
+ * and the whole effect no-ops under `prefers-reduced-motion`.
  */
 export function useParallax<T extends HTMLElement = HTMLDivElement>({
   speed = 0.2,
@@ -35,14 +57,24 @@ export function useParallax<T extends HTMLElement = HTMLDivElement>({
 
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
+    let base = 0; // transform-independent position along the scroll axis
     let ticking = false;
+
+    const measureBase = () => {
+      const offset = documentOffset(el);
+      base = axis === 'y' ? offset.y : offset.x;
+    };
 
     const apply = () => {
       ticking = false;
-      const rect = el.getBoundingClientRect();
-      const vh = window.innerHeight || 1;
-      // -1 when the element sits a full viewport below centre, +1 when above.
-      const progress = (rect.top + rect.height / 2 - vh / 2) / vh;
+      const viewport = (axis === 'y' ? window.innerHeight : window.innerWidth) || 1;
+      const scroll = axis === 'y' ? window.scrollY : window.scrollX;
+      const size = axis === 'y' ? el.offsetHeight : el.offsetWidth;
+
+      // Where the element's centre sits relative to the viewport centre, in
+      // untransformed layout space.
+      const centreInViewport = base + size / 2 - scroll;
+      const progress = (centreInViewport - viewport / 2) / viewport;
 
       const shift = progress * speed * 100;
       const translate =
@@ -67,12 +99,18 @@ export function useParallax<T extends HTMLElement = HTMLDivElement>({
       }
     };
 
+    const onResize = () => {
+      measureBase();
+      onScroll();
+    };
+
+    measureBase();
     apply();
     window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
+    window.addEventListener('resize', onResize);
     return () => {
       window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      window.removeEventListener('resize', onResize);
     };
   }, [speed, axis, scale, rotate, fade]);
 
